@@ -1,9 +1,14 @@
+import os
+
 import numpy as np
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 import torch
 from sklearn.model_selection import train_test_split
 from torch import nn, optim
 from torch.utils.data import TensorDataset, DataLoader, Dataset
 
+from dataloder import SEED
 from model import DAGCN
 
 # 数据加载与划分
@@ -20,8 +25,8 @@ class Dataset(torch.utils.data.Dataset):
 
 def load_data():
     # 加载训练数据和标签文件
-    all_data = np.load("features_subject_1.npy")
-    all_label = np.load("labels_subject_1.npy")
+    all_data = np.load("features.npy")
+    all_label = np.load("labels.npy")
 
     # 按照 8:2 划分数据为训练集和测试集
     train_data, test_data, train_label, test_label = train_test_split(all_data, all_label, test_size=0.2,
@@ -42,7 +47,8 @@ def train(model, train_loader, criterion, optimizer, device):
     correct = 0
     total = 0
     for inputs, labels in train_loader:
-        inputs, labels = inputs.to(device), labels.to(device)
+        inputs, labels = inputs.to(device).float(), labels.to(device).long()
+        labels += 1
 
         optimizer.zero_grad()
         outputs,_ = model(inputs)
@@ -69,7 +75,8 @@ def validate(model, test_loader, criterion, device):
     total = 0
     with torch.no_grad():
         for inputs, labels in test_loader:
-            inputs, labels = inputs.to(device), labels.to(device)
+            inputs, labels = inputs.to(device).float(), labels.to(device).long()
+            labels += 1
 
             outputs,_ = model(inputs)
             _, predicted = torch.max(outputs.data, 1)
@@ -87,12 +94,17 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # 加载数据
-    train_dataset, test_dataset = load_data()
+    # train_dataset, test_dataset = load_data()
+    # train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    # test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+
+    train_dataset = SEED(train_test='TRAIN')
+    test_dataset = SEED(train_test='TEST')
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
     # 实例化模型
-    model = DAGCN(dataset='iaps').to(device)
+    model = DAGCN(dataset='seed').to(device)
 
     # 损失函数与优化器
     criterion = nn.CrossEntropyLoss()
